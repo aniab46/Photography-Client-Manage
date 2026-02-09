@@ -1,0 +1,16 @@
+jQuery(document).ready(function($) {
+    $('.pcm-download').on('click', function() {
+        var btn = $(this);
+        $.post(pcm_ajax_obj.ajax_url, {
+            action: 'pcm_handle_download',
+            post_id: btn.data('post'),
+            attachment_id: btn.data('img')
+        }, function(res) {
+            if (res.success) {
+                window.open(res.data.url, '_blank');
+            } else {
+                alert(res.data.message);
+            }
+        });
+    });
+});
