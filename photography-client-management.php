@@ -35,9 +35,7 @@ class PCM_photography_Client_Management {
         include_once plugin_dir_path(__FILE__) .'include/client/client_single_page.php';  
         new photographyclientmanagement\Client_single_page();
 
-        // Ajax handler include and initialization
-        include_once plugin_dir_path(__FILE__) .'include/client/ajax_handler.php';  
-        new ajaxhandler\ajax_handler();
+        
 
         
     }

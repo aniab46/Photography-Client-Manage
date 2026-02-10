@@ -5,7 +5,11 @@ namespace photographyclientmanagement;
 class Client_single_page{
     public function __construct(){
         add_filter('the_content',[$this,'display_client_details'],20,1);
-        add_action('wp_enqueue_scripts',callback: [$this,'enqueue_styles_and_scripts']);
+        add_action('wp_enqueue_scripts', [$this,'enqueue_styles_and_scripts']);
+
+        // Ajax handler include and initialization
+        include_once plugin_dir_path(__FILE__) .'ajax_handler.php';
+        new \ajaxhandler\ajax_handler();
         
     }
 
@@ -20,29 +24,32 @@ class Client_single_page{
                 $gallery = rwmb_meta( 'pcm_client_gallery', ['size' => 'full'], get_the_ID() );
                 foreach ($gallery as $image) {
                     $attachment_id = $image['ID'];
-                    $cloudinary_url = get_post_meta($attachment_id,                 '_pcm_cloudinary_url', true);
-                    $is_paid = get_post_meta(get_the_ID(),              '_is_paid', true);
+                    $cloudinary_url = get_post_meta($attachment_id, '_pcm_cloudinary_url', true);
+                    $is_paid = get_post_meta(get_the_ID(), '_is_paid', true);
 
-                    if (!$cloudinary_url) {
-                        $cloudinary_url = $image['full_url']; // Fallback to original URL if not uploaded to Cloudinary
-                    }
-
-                    // If not paid, show low quality blurred image, otherwise show original quality.
+                    // If not paid, show low quality blurred image from Cloudinary only
                     if ($is_paid !== 'yes') {
-                        $display_url = str_replace('/upload/', '/               upload/w_400,q_auto:low,e_blur:200/',           $cloudinary_url);
+                        // Free users: only show image if it exists on Cloudinary
+                        if (!$cloudinary_url) {
+                            $content .= '<div class="photo-card" style="display:inline-block; margin:10px; border:1px solid #ddd; padding:5px;">';
+                            $content .= '<div style="max-width: 200px; height: 200px; background-color: #f0f0f0; display:flex; align-items:center; justify-content:center;">Image processing...</div>';
+                            $content .= '</div>';
+                            continue;
+                        }
+                        $display_url = str_replace('/upload/', '/upload/w_400,q_auto:low,e_blur:200/', $cloudinary_url);
                         $btn_text = "Download (Free)";
                     } else {
-                        $display_url = $cloudinary_url; 
-                        // Paid user gets the original high-quality image
+                        // Paid users: fallback to original if Cloudinary not available
+                        $display_url = $cloudinary_url ? $cloudinary_url : $image['full_url'];
                         $btn_text = "Download High Res";
                     }
 
-                    $content .= '<div class="photo-card"                style="display:inline-block; margin:10px; border:1px solid              #ddd; padding:5px;">';
-                    $content .= '<img src="' . esc_url($display_url) . '"               style="max-width: 200px; display:block;">';
+                    $content .= '<div class="photo-card" style="display:inline-block; margin:10px; border:1px solid #ddd; padding:5px;">';
+                    $content .= '<img src="' . esc_url($display_url) . '" style="max-width: 200px; display:block;">';
 
                     // Download button with data attributes for JavaScript handling
-                    $content .= '<button class="pcm-download" data-img="'.              $attachment_id.'" data-post="'.get_the_ID().'">'.$btn_text.'</              button>';
-                    $content .= '<button class="pcm-print" data-img="'.             $attachment_id.'">Request Print</button>';
+                    $content .= '<button class="pcm-download" data-img="' . esc_attr($attachment_id) . '" data-post="' . get_the_ID() . '">' . esc_html($btn_text) . '</button>';
+                    $content .= '<button class="pcm-print" data-img="' . esc_attr($attachment_id) . '">Request Print</button>';
                     $content .= '</div>';
                 }
                 } else {

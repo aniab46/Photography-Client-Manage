@@ -1,0 +1,12 @@
+{
+    "name": "photography-client-management/plugin",
+    "type": "wordpress-plugin",
+    "require": {
+        "cloudinary/cloudinary_php": "^2.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "photographyclientmanagement\\": "include/"
+        }
+    }
+}

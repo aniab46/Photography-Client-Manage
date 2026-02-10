@@ -15,14 +15,31 @@ class ajax_handler{
 
     function pcm_handle_download() {
         global $wpdb;
+        // Verify nonce
+        if ( empty( $_POST['nonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['nonce'] ) ), 'pcm_ajax_nonce' ) ) {
+            wp_send_json_error(['message' => 'Invalid request.']);
+        }
+
         $post_id = intval($_POST['post_id']);
         $attachment_id = intval($_POST['attachment_id']);
         $client_ip = $_SERVER['REMOTE_ADDR'];
         $table_name = $wpdb->prefix . 'pcm_activities';
 
-        $is_paid = get_post_meta($post_id, '_is_paid',  true);
-        $cloudinary_url = get_post_meta($attachment_id,     '_pcm_cloudinary_url', true);
+        $is_paid = get_post_meta($post_id, '_is_paid', true);
 
+        $cloudinary_url = get_post_meta($attachment_id, '_pcm_cloudinary_url', true);
+        
+        // Free users can only access images through Cloudinary with transformations
+        if ($is_paid !== 'yes' && empty($cloudinary_url)) {
+            wp_send_json_error(['message' => 'Image is still being processed. Please check back soon.']);
+        }
+        
+        // Paid users can fallback to original attachment URL
+        if (empty($cloudinary_url)) {
+            $cloudinary_url = wp_get_attachment_url($attachment_id);
+        }
+
+        // Paid users get original high res
         if ($is_paid === 'yes') {
             wp_send_json_success(['url' => $cloudinary_url]);
         }
@@ -34,12 +51,14 @@ class ajax_handler{
         ));
 
         if ($already_done > 0) {
-            wp_send_json_success(['url' => $cloudinary_url]);
+            // If already downloaded, return low-res URL
+            $low_url = str_replace('/upload/', '/upload/w_800,q_auto:low,e_blur:200/', $cloudinary_url);
+            wp_send_json_success(['url' => $low_url]);
         }
 
         // Total downloads from this IP for this post?
         $total_downloads = $wpdb->get_var($wpdb->prepare(
-            "SELECT COUNT(DISTINCT attachment_id) FROM  $table_name WHERE post_id = %d AND client_ip = %s AND    action_type = 'download'",
+            "SELECT COUNT(DISTINCT attachment_id) FROM $table_name WHERE post_id = %d AND client_ip = %s AND action_type = 'download'",
             $post_id, $client_ip
         ));
 
@@ -50,7 +69,8 @@ class ajax_handler{
                 'client_ip' => $client_ip,
                 'action_type' => 'download'
             ]);
-            wp_send_json_success(['url' => $cloudinary_url,     'remaining' => 4 - $total_downloads]);
+            $low_url = str_replace('/upload/', '/upload/w_800,q_auto:low,e_blur:200/', $cloudinary_url);
+            wp_send_json_success(['url' => $low_url, 'remaining' => 4 - $total_downloads]);
         } else {
             wp_send_json_error(['message' => 'Your 5 free downloads for this post are over. Please contact the photographer for more.']);
         }

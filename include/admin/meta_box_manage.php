@@ -42,7 +42,7 @@ class Meta_box_manage{
         <label for="client_security_code">Security Code:</label>
         <input type="text" name="client_security_code" id="client_security_code" value="<?php echo esc_attr($client_security_code); ?>" size="25" />
         <?php
-        // images input field for client gallery
+        
         
 
     }
@@ -60,17 +60,33 @@ class Meta_box_manage{
             delete_post_meta($post_id, '_client_security_code');
         }
 
-        $gallery_ids = get_post_meta($post_id, 'pcm_client_gallery', true); // Meta Box field ID
+        // Get gallery images using rwmb_meta() for Meta Box plugin
+        $gallery_images = rwmb_meta('pcm_client_gallery', array('size' => 'full'), $post_id);
 
-    if (!empty($gallery_ids)) {
-        $cloudinary = new \photographyclientmanagement_admin\Cloudinary_Handler();
-        foreach ($gallery_ids as $attachment_id) {
-            // Check if the image has already been uploaded to Cloudinary to avoid duplicate uploads
-            $exists = get_post_meta($attachment_id, '_pcm_cloudinary_url', true);
-            if (!$exists) {
-                $cloudinary->upload_image($attachment_id);
+        if (!empty($gallery_images) && is_array($gallery_images)) {
+            $cloudinary = new \photographyclientmanagement_admin\Cloudinary_Handler();
+            foreach ($gallery_images as $image) {
+                // Extract attachment ID from image array
+                $attachment_id = isset($image['ID']) ? $image['ID'] : (is_numeric($image) ? $image : null);
+                
+                if (!$attachment_id) {
+                    continue;
+                }
+                
+                // Check if the image has already been uploaded to Cloudinary to avoid duplicate uploads
+                $exists = get_post_meta($attachment_id, '_pcm_cloudinary_url', true);
+                if (!$exists) {
+                    error_log("PCM: Uploading attachment ID: " . $attachment_id);
+                    $result = $cloudinary->upload_image($attachment_id);
+                    if ($result) {
+                        error_log("PCM: Successfully uploaded attachment ID: " . $attachment_id);
+                    } else {
+                        error_log("PCM: Failed to upload attachment ID: " . $attachment_id);
+                    }
+                }
             }
-        }
+        } else {
+            error_log("PCM: No gallery images found or gallery_images is not an array. Type: " . gettype($gallery_images));
         }
     }
 
